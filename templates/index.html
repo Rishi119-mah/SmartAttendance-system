@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --bg: #0a0a0f;
+            --card: #13131a;
+            --card-hover: #1a1a24;
+            --accent: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.15);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --border: rgba(255, 255, 255, 0.08);
+            
+            --sidebar-width: 260px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .nav-items {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--muted);
+            font-weight: 500;
+            transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nav-item:hover, .nav-item.active {
+            background-color: var(--accent-glow);
+            color: var(--accent);
+        }
+        .sidebar-footer {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-align: center;
+            margin-top: auto;
+        }
+
+        /* MAIN CONTENT */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .top-bar {
+            height: 70px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+            background-color: var(--card);
+        }
+        .page-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .clock {
+            color: var(--muted);
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .page {
+            display: none;
+            opacity: 0;
+            transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .page.active {
+            display: block;
+            opacity: 1;
+            animation: fadeIn 300ms ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* COMPONENTS */
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        
+        .metric-card {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: transform 200ms, box-shadow 200ms;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px var(--accent-glow);
+            border-color: var(--accent);
+        }
+        .metric-label {
+            color: var(--muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .chart-container {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        /* Table */
+        .table-container {
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: rgba(0,0,0,0.2);
+            color: var(--muted);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover td { background-color: var(--card-hover); }
+
+        /* Buttons & Inputs */
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            transition: border-color 200ms, box-shadow 200ms;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 200ms, background-color 200ms;
+            width: 100%;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn:hover { background-color: #6d28d9; }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        .btn-outline:hover { background-color: var(--accent-glow); }
+
+        /* Specific Layouts */
+        .center-card {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: var(--card);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        
+        #video-element {
+            width: 100%;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            background-color: #000;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bg);
+            border-radius: 4px;
+            margin: 1rem 0;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--accent);
+            transition: width 0.3s ease;
+        }
+        
+        .status-log {
+            font-family: monospace;
+            color: var(--success);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            height: 20px;
+        }
+
+        .flex-row { display: flex; gap: 1.5rem; }
+        .flex-col { display: flex; flex-direction: column; gap: 1rem; }
+        .flex-1 { flex: 1; }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-success { background-color: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .badge-danger { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .badge-warning { background-color: rgba(245, 158, 11, 0.1); color: var(--warning); }
+
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="logo">🎓 Smart Attendance</div>
+        <div class="nav-items" id="nav-menu">
+            <div class="nav-item active" data-target="page-dashboard">Dashboard</div>
+            <div class="nav-item" data-target="page-register">Register</div>
+            <div class="nav-item" data-target="page-attendance">Attendance</div>
+            <div class="nav-item" data-target="page-analytics">Analytics</div>
+            <div class="nav-item" data-target="page-reports">AI Reports</div>
+            <div class="nav-item" data-target="page-database">Database</div>
+        </div>
+        <div class="sidebar-footer">OpenCV · sklearn · NLG</div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <div class="top-bar">
+            <div class="page-title" id="top-title">Dashboard</div>
+            <div class="clock" id="live-clock">00:00:00</div>
+        </div>
+        
+        <div class="content-area">
+            
+            <!-- DASHBOARD PAGE -->
+            <div id="page-dashboard" class="page active">
+                <div class="grid-4">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Students</div>
+                        <div class="metric-value" id="dash-total">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Today Present</div>
+                        <div class="metric-value" id="dash-present">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Overall Rate</div>
+                        <div class="metric-value" id="dash-rate">0%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">At Risk</div>
+                        <div class="metric-value" style="color: var(--danger)" id="dash-risk">0</div>
+                    </div>
+                </div>
+                
+                <div class="grid-2">
+                    <div class="chart-container">
+                        <h3 style="margin-bottom: 1rem; font-weight: 500;">14-Day Trend</h3>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 style="margin-bottom: 1rem; font-weight: 500;">This Week</h3>
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 1rem; font-weight: 500;">Recent Activity</h3>
+                <div class="table-container">
+                    <table id="activity-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- REGISTER PAGE -->
+            <div id="page-register" class="page">
+                <div class="center-card">
+                    <h2 style="margin-bottom: 1.5rem;">Register New Student</h2>
+                    <input type="text" id="reg-name" placeholder="Enter Full Name">
+                    
+                    <video id="reg-video" autoplay playsinline style="width: 100%; border-radius: 8px; border: 2px solid var(--border); background-color: #000; margin-bottom: 1rem; display: none;"></video>
+                    <canvas id="reg-canvas" style="display:none;"></canvas>
+
+                    <button class="btn" id="btn-register" onclick="startRegistration()">📷 Start Registration</button>
+                    
+                    <div id="reg-progress-container" class="progress-bar-container">
+                        <div class="progress-bar" id="reg-progress"></div>
+                    </div>
+                    <div id="reg-log" style="margin-top: 1rem; font-weight: bold;"></div>
+                </div>
+            </div>
+
+            <!-- TAKE ATTENDANCE PAGE -->
+            <div id="page-attendance" class="page">
+                <div class="flex-row">
+                    <div class="flex-1 chart-container flex-col">
+                        <h3>Live Camera Feed</h3>
+                        <video id="video-element" autoplay playsinline></video>
+                        <canvas id="canvas-element" style="display:none;"></canvas>
+                        <div class="flex-row">
+                            <button class="btn" id="btn-start-cam" onclick="startAttendanceCamera()">Start Camera</button>
+                            <button class="btn btn-outline" id="btn-stop-cam" onclick="stopAttendanceCamera()" disabled>Stop Camera</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 chart-container flex-col">
+                        <h3>Recognition Log</h3>
+                        <div id="recognition-log" style="flex:1; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:1rem; display:flex; flex-direction:column; gap:0.5rem; max-height:400px;">
+                            <div style="color:var(--muted)">Waiting for camera...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANALYTICS PAGE -->
+            <div id="page-analytics" class="page">
+                <div class="grid-2">
+                    <div class="chart-container">
+                        <h3 style="margin-bottom:1rem;">Student Risk Assessment</h3>
+                        <select id="analytics-name" style="width: 100%; padding: 0.75rem 1rem; background-color: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                            <option value="">Select a Student...</option>
+                        </select>
+                        <button class="btn" onclick="fetchAnalytics()">Analyze</button>
+                        <div id="analytics-result" style="margin-top:1.5rem; white-space:pre-wrap;"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3 style="margin-bottom:1rem;">Anomaly Detection (Isolation Forest)</h3>
+                        <button class="btn" onclick="fetchAnomalies()">Run Anomaly Detection</button>
+                        <div id="anomaly-result" style="margin-top:1.5rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS PAGE -->
+            <div id="page-reports" class="page">
+                <div class="grid-2">
+                    <div class="flex-col">
+                        <button class="btn" onclick="generateReport()">📄 Generate Weekly Summary Report</button>
+                        <div class="chart-container" id="report-output" style="white-space:pre-wrap; display:none;"></div>
+                    </div>
+                    <div class="flex-col">
+                        <div class="chart-container">
+                            <h3>Generate Interventions</h3>
+                            <select id="action-name" style="width: 100%; padding: 0.75rem 1rem; background-color: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
+                                <option value="">Select a Student...</option>
+                            </select>
+                            <div class="flex-row">
+                                <button class="btn" onclick="generateLetter()">Warning Letter</button>
+                                <button class="btn btn-outline" onclick="generateParentNote()">Parent Note</button>
+                            </div>
+                            <div id="action-output" style="margin-top:1.5rem; white-space:pre-wrap; color:var(--muted)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DATABASE PAGE -->
+            <div id="page-database" class="page">
+                <div class="flex-row" style="margin-bottom:1.5rem;">
+                    <button class="btn btn-outline" style="width:auto;" onclick="window.location.href='/api/export/students'">📥 Export Students CSV</button>
+                    <button class="btn btn-outline" style="width:auto;" onclick="window.location.href='/api/export/attendance'">📥 Export Attendance CSV</button>
+                </div>
+                <div class="grid-2">
+                    <div class="table-container">
+                        <h3 style="padding:1rem;">Students</h3>
+                        <table id="db-students">
+                            <thead><tr><th>ID</th><th>Name</th><th>Registered At</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="table-container">
+                        <h3 style="padding:1rem;">Attendance (Recent 50)</h3>
+                        <table id="db-attendance">
+                            <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Confidence</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "/api";
+
+        // ROUTING
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                const targetId = e.target.getAttribute('data-target');
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+                
+                document.getElementById('top-title').innerText = e.target.innerText;
+                
+                // Load data on page change
+                if(targetId === 'page-dashboard') loadDashboard();
+                if(targetId === 'page-database') loadDatabase();
+            });
+        });
+
+        // LIVE CLOCK
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-US', {hour12: false});
+        }, 1000);
+
+        // DASHBOARD LOGIC
+        let trendChartObj = null;
+        let barChartObj = null;
+        
+        async function loadDashboard() {
+            try {
+                const res = await fetch(`${API_BASE}/dashboard`);
+                const data = await res.json();
+                
+                // Animate numbers up
+                animateValue('dash-total', 0, data.total_students, 500);
+                animateValue('dash-present', 0, data.today_count, 500);
+                document.getElementById('dash-rate').innerText = data.overall_rate + "%";
+                animateValue('dash-risk', 0, data.at_risk_count, 500);
+                
+                // Charts
+                const trendCtx = document.getElementById('trendChart').getContext('2d');
+                if(trendChartObj) trendChartObj.destroy();
+                trendChartObj = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.trend_last_14_days.map(d => d.date),
+                        datasets: [{
+                            label: 'Attendance',
+                            data: data.trend_last_14_days.map(d => d.count),
+                            borderColor: '#7c3aed',
+                            backgroundColor: 'rgba(124, 58, 237, 0.2)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+                });
+
+                const barCtx = document.getElementById('barChart').getContext('2d');
+                if(barChartObj) barChartObj.destroy();
+                barChartObj = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.weekly_bar.map(d => d.day),
+                        datasets: [{
+                            label: 'Attendance',
+                            data: data.weekly_bar.map(d => d.count),
+                            backgroundColor: '#10b981',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: { scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+                });
+                
+                // Table
+                const tbody = document.querySelector('#activity-table tbody');
+                tbody.innerHTML = '';
+                data.recent_activity.forEach(r => {
+                    tbody.innerHTML += `<tr><td>${r.student_name}</td><td>${r.date}</td><td>${r.time}</td><td>${r.confidence}%</td></tr>`;
+                });
+                
+            } catch (err) { console.error(err); }
+        }
+        
+        function animateValue(id, start, end, duration) {
+            const obj = document.getElementById(id);
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                obj.innerHTML = Math.floor(progress * (end - start) + start);
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        async function startRegistration() {
+            const name = document.getElementById('reg-name').value;
+            if(!name) {
+                alert("Please enter a name");
+                return;
+            }
+            
+            const btn = document.getElementById('btn-register');
+            const log = document.getElementById('reg-log');
+            const progressContainer = document.getElementById('reg-progress-container');
+            const progressBar = document.getElementById('reg-progress');
+            const video = document.getElementById('reg-video');
+            const canvas = document.getElementById('reg-canvas');
+            
+            btn.disabled = true;
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            log.innerHTML = "✅ Opening camera...";
+            video.style.display = 'block';
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                log.innerHTML = "✅ Initializing...";
+                await fetch(`${API_BASE}/register/start`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: name})
+                });
+                
+                let captured = 0;
+                log.innerHTML = "✅ Capturing samples (Please look at webcam)...";
+                
+                const captureInterval = setInterval(async () => {
+                    if (captured >= 50) {
+                        clearInterval(captureInterval);
+                        stream.getTracks().forEach(t => t.stop());
+                        video.srcObject = null;
+                        video.style.display = 'none';
+                        
+                        log.innerHTML = "⏳ Training model... please wait.";
+                        const res = await fetch(`${API_BASE}/register/train`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({name: name})
+                        });
+                        const data = await res.json();
+                        
+                        if(data.success) {
+                            log.innerHTML = `✅ Success! Model trained.`;
+                            document.getElementById('reg-name').value = '';
+                        } else {
+                            log.innerHTML = `❌ Error: ${data.message}`;
+                        }
+                        
+                        btn.disabled = false;
+                        setTimeout(() => {
+                            progressContainer.style.display = 'none';
+                            log.innerHTML = '';
+                        }, 5000);
+                        return;
+                    }
+                    
+                    if (video.videoWidth === 0) return;
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    const base64Img = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    try {
+                        const res = await fetch(`${API_BASE}/register/frame`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({name: name, count: captured, image: base64Img})
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            captured++;
+                            progressBar.style.width = (captured * 2) + '%';
+                        }
+                    } catch(e) {
+                        console.error("Frame capture error:", e);
+                    }
+                }, 150);
+                
+            } catch(e) {
+                log.innerHTML = `❌ Camera Error: ${e.message}`;
+                btn.disabled = false;
+                video.style.display = 'none';
+            }
+        }
+
+        // ATTENDANCE CAMERA
+        let videoStream = null;
+        let captureInterval = null;
+        
+        async function startAttendanceCamera() {
+            const video = document.getElementById('video-element');
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = videoStream;
+                document.getElementById('btn-start-cam').disabled = true;
+                document.getElementById('btn-stop-cam').disabled = false;
+                document.getElementById('recognition-log').innerHTML = '';
+                
+                // Send frame to backend every 1.5 seconds
+                captureInterval = setInterval(processFrame, 1500);
+            } catch (err) {
+                alert("Cannot access webcam: " + err);
+            }
+        }
+        
+        function stopAttendanceCamera() {
+            if(videoStream) {
+                videoStream.getTracks().forEach(t => t.stop());
+                videoStream = null;
+            }
+            if(captureInterval) clearInterval(captureInterval);
+            document.getElementById('video-element').srcObject = null;
+            document.getElementById('btn-start-cam').disabled = false;
+            document.getElementById('btn-stop-cam').disabled = true;
+        }
+        
+        async function processFrame() {
+            const video = document.getElementById('video-element');
+            const canvas = document.getElementById('canvas-element');
+            if(video.videoWidth === 0) return;
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            const base64Img = canvas.toDataURL('image/jpeg', 0.8);
+            
+            try {
+                const res = await fetch(`${API_BASE}/capture-frame`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: base64Img})
+                });
+                const data = await res.json();
+                
+                if(data.faces && data.faces.length > 0) {
+                    data.faces.forEach(async face => {
+                        if(face.name !== "Unknown") {
+                            if (face.confidence < 50) {
+                                const logDiv = document.getElementById('recognition-log');
+                                logDiv.innerHTML = `<div style="padding:0.5rem; background:var(--card-hover); border-left:4px solid var(--warning); margin-bottom:0.5rem;">
+                                    ⚠️ <strong>${face.name}</strong> detected but confidence too low (${face.confidence}%). Look directly at the camera.
+                                </div>` + logDiv.innerHTML;
+                                return;
+                            }
+                            // Mark attendance
+                            const attRes = await fetch(`${API_BASE}/mark-attendance`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({student_name: face.name, confidence: face.confidence})
+                            });
+                            const attData = await attRes.json();
+                            
+                            const logDiv = document.getElementById('recognition-log');
+                            const timeStr = new Date().toLocaleTimeString();
+                            if(attData.success) {
+                                logDiv.innerHTML = `<div style="padding:0.5rem; background:var(--card-hover); border-left:4px solid var(--success); margin-bottom:0.5rem;">
+                                    ✅ <strong>${face.name}</strong> marked present at ${timeStr} (${face.confidence}% conf)
+                                </div>` + logDiv.innerHTML;
+                                stopAttendanceCamera();
+                            } else if (attData.already_marked) {
+                                logDiv.innerHTML = `<div style="padding:0.5rem; background:var(--card-hover); border-left:4px solid var(--warning); margin-bottom:0.5rem;">
+                                    ⚠️ <strong>${face.name}</strong> is already marked present for today.
+                                </div>` + logDiv.innerHTML;
+                                stopAttendanceCamera();
+                            }
+                        } else {
+                            const logDiv = document.getElementById('recognition-log');
+                            logDiv.innerHTML = `<div style="padding:0.5rem; background:var(--card-hover); border-left:4px solid var(--danger); margin-bottom:0.5rem;">
+                                ❌ Unknown face detected (${face.confidence}% conf)
+                            </div>` + logDiv.innerHTML;
+                        }
+                    });
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ANALYTICS & REPORTS
+        async function fetchAnalytics() {
+            const name = document.getElementById('analytics-name').value;
+            const url = name ? `${API_BASE}/analytics/?name=${name}` : `${API_BASE}/analytics/`;
+            const out = document.getElementById('analytics-result');
+            out.innerHTML = "Processing...";
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                let riskColor = 'var(--success)';
+                if (data.risk_level === 'MEDIUM') riskColor = 'var(--warning)';
+                if (data.risk_level === 'HIGH') riskColor = 'var(--danger)';
+                
+                const msg = data.message ? `<p style="color:var(--muted); margin-bottom:1.5rem;">${data.message}</p>` : `<p style="color:var(--muted); margin-bottom:1.5rem;">ML prediction based on recent attendance metrics.</p>`;
+                
+                out.innerHTML = `
+                    <div style="background:var(--card-hover); padding:1.5rem; border-radius:8px; border-left:4px solid ${riskColor};">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                            <h4 style="font-size:1.2rem; font-weight:600;">Risk Level: <span style="color:${riskColor}">${data.risk_level}</span></h4>
+                            <div class="badge" style="background:${riskColor}; color:#fff; padding:0.4rem 0.8rem;">${data.risk_confidence.toFixed(1)}% Confidence</div>
+                        </div>
+                        ${msg}
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                            <div style="background:var(--card); padding:1rem; border-radius:6px; border:1px solid var(--border);">
+                                <div style="font-size:0.8rem; color:var(--muted); text-transform:uppercase; margin-bottom:0.3rem;">Attendance Rate</div>
+                                <div style="font-size:1.5rem; font-weight:700;">${(data.attendance_rate * 100).toFixed(0)}%</div>
+                            </div>
+                            <div style="background:var(--card); padding:1rem; border-radius:6px; border:1px solid var(--border);">
+                                <div style="font-size:0.8rem; color:var(--muted); text-transform:uppercase; margin-bottom:0.3rem;">Current Absent Streak</div>
+                                <div style="font-size:1.5rem; font-weight:700;">${data.streak_absent} Days</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch(e) { out.innerHTML = "Error loading analytics."; }
+        }
+        
+        async function fetchAnomalies() {
+            const out = document.getElementById('anomaly-result');
+            out.innerHTML = "Scanning database for anomalies...";
+            try {
+                const res = await fetch(`${API_BASE}/anomalies`);
+                const data = await res.json();
+                if(data.length === 0) out.innerHTML = "<div class='badge badge-success'>No anomalies detected in student behaviors.</div>";
+                else {
+                    let html = `<ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem;">`;
+                    data.forEach(d => {
+                        html += `<li style="background:var(--card-hover); padding:1rem; border-radius:8px; border-left:4px solid var(--warning);">
+                            <strong>${d.student_name}</strong> - Score: ${d.anomaly_score.toFixed(2)}<br>
+                            <span style="color:var(--muted)">Reason: ${d.reason}</span>
+                        </li>`;
+                    });
+                    html += `</ul>`;
+                    out.innerHTML = html;
+                }
+            } catch(e) { out.innerHTML = "Error"; }
+        }
+
+        async function generateReport() {
+            const out = document.getElementById('report-output');
+            out.style.display = 'block';
+            out.innerHTML = "Generating NLP report locally...";
+            try {
+                const res = await fetch(`${API_BASE}/generate-report`);
+                const data = await res.json();
+                out.innerHTML = `<strong>Similar past week:</strong> ${data.similar_week}\n\n${data.report_text}`;
+            } catch(e) { out.innerHTML = "Error"; }
+        }
+
+        async function generateLetter() {
+            const name = document.getElementById('action-name').value;
+            if(!name) return;
+            const out = document.getElementById('action-output');
+            out.innerHTML = "Generating letter...";
+            try {
+                const res = await fetch(`${API_BASE}/generate-letter`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_name: name})
+                });
+                const data = await res.json();
+                out.innerHTML = data.letter_text;
+            } catch(e) { out.innerHTML = "Error"; }
+        }
+        
+        async function generateParentNote() {
+            const name = document.getElementById('action-name').value;
+            if(!name) return;
+            const out = document.getElementById('action-output');
+            out.innerHTML = "Generating note...";
+            try {
+                const res = await fetch(`${API_BASE}/generate-parent-note`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({student_name: name})
+                });
+                const data = await res.json();
+                out.innerHTML = data.note_text;
+            } catch(e) { out.innerHTML = "Error"; }
+        }
+
+        // INIT DROPDOWNS
+        async function populateDropdowns() {
+            try {
+                const res = await fetch(`${API_BASE}/students`);
+                const data = await res.json();
+                
+                const options = '<option value="">Select a Student...</option>' + 
+                    data.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+                
+                const aSelect = document.getElementById('analytics-name');
+                if(aSelect) aSelect.innerHTML = options;
+                
+                const rSelect = document.getElementById('action-name');
+                if(rSelect) rSelect.innerHTML = options;
+            } catch (e) { console.error("Error loading dropdowns:", e); }
+        }
+
+        // DATABASE
+        async function loadDatabase() {
+            try {
+                const sRes = await fetch(`${API_BASE}/students`);
+                const sData = await sRes.json();
+                const sBody = document.querySelector('#db-students tbody');
+                sBody.innerHTML = sData.map(d => `<tr><td>${d.id}</td><td>${d.name}</td><td>${d.registered_at}</td></tr>`).join('');
+                
+                const aRes = await fetch(`${API_BASE}/attendance`);
+                const aData = await aRes.json();
+                const aBody = document.querySelector('#db-attendance tbody');
+                aBody.innerHTML = aData.slice(0,50).map(d => `<tr><td>${d.student_name}</td><td>${d.date}</td><td>${d.time}</td><td>${d.confidence}%</td></tr>`).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        // Init
+        populateDropdowns();
+        loadDashboard();
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+*.db
+*.sqlite3
+
+# OS Files
+.DS_Store
+
+# Machine Learning Artifacts & Private Data
+dataset/
+models/
+
+# Application Logs
+*.log
